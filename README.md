@@ -1,6 +1,6 @@
 # Embedr Module for ProcessWire
 
-**Version:** 0.2.12  
+**Version:** 0.2.13  
 **Author:** Maxim Alex
 **License:** MIT  
 **ProcessWire:** 3.0+
@@ -16,7 +16,7 @@ Dynamic content embed management system with live preview, custom PHP templates,
 - 🔄 **Live Preview** - Real-time preview in the admin interface
 - 📝 **Custom PHP Templates** - Full control with custom PHP rendering templates
 - 🎨 **Visual Card Builder** - Built-in UIKit-based card renderer (no PHP needed)
-- 🏷️ **Shortcode System** - Simple `((embed-name))` tags in any text field
+- 🏷️ **Shortcode System** - Simple `{% raw %}((embed-name)){% endraw %}` tags in any text field
 - 🔍 **Debug Mode** - Comprehensive logging for troubleshooting
 
 ### Advanced Features
@@ -75,7 +75,7 @@ Selector: template=article, limit=6
 
 3. **Use in templates:**
 ```
-Body field: ((latest-articles))
+{% raw %}Body field: ((latest-articles)){% endraw %}
 ```
 
 ---
@@ -98,6 +98,7 @@ Embedr Ecosystem
 ### Data Flow
 
 ```
+{% raw %}
 1. Text Field with ((embed-name))
    ↓
 2. TextformatterEmbedr (Textformatter)
@@ -111,6 +112,7 @@ Embedr Ecosystem
    └─→ NO:  Use EmbedrRenderer (visual cards)
    ↓
 6. Return HTML
+{% endraw %}
 ```
 
 ---
@@ -127,7 +129,7 @@ Access via: `Setup → Modules → ProcessEmbedr → Configure`
 
 **Opening Tag** (default: `((`)
 - Tag that starts an embed
-- Can be customized (e.g., `{{`, `[[`)
+- Can be customized (e.g., `{% raw %}{{{% endraw %}`, `[[`)
 
 **Closing Tag** (default: `))`)
 - Tag that ends an embed
@@ -180,16 +182,18 @@ Selector: template=article, sort=-created, limit=6
 
 **In any text field:**
 ```html
+{% raw %}
 <h2>Recent Posts</h2>
 ((latest-articles))
 
 <h2>Featured Products</h2>
 ((featured-products))
+{% endraw %}
 ```
 
 **In PHP templates:**
 ```php
-echo $page->body; // Textformatter processes ((tags)) automatically
+echo $page->body; // Textformatter processes {% raw %}((tags)){% endraw %} automatically
 ```
 
 ---
@@ -415,7 +419,7 @@ Shows:
 **Solutions:**
 - Check embed exists: `Setup → Embedr`
 - Verify name spelling (lowercase, no spaces)
-- Use correct format: `((name))` not `(name)` or `{{name}}`
+- Use correct format: `{% raw %}((name)){% endraw %}` not `(name)` or `{% raw %}{{name}}{% endraw %}`
 
 #### 2. Template not found
 ```
@@ -514,7 +518,7 @@ $embed->type        // EmbedrType - Type object
 ```php
 $embed->render()           // string - Render to HTML
 $embed->getType()          // EmbedrType|null - Get type object
-$embed->getShortcode()     // string - Get ((name)) tag
+$embed->getShortcode()     // string - Get {% raw %}((name)){% endraw %} tag
 $embed->getCount()         // int - Count results without rendering
 ```
 
