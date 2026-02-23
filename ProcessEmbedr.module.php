@@ -18,7 +18,7 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr',
-            'version' => '0.2.12',
+            'version' => '0.2.13',
             'summary' => 'Manage dynamic content embeds with live preview',
             'author' => 'Maxim Alex',
             'href' => 'https://github.com/mxmsmnv/Embedr',
@@ -28,7 +28,8 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
                 'embedr' => 'List and view embeds',
                 'embedr-edit' => 'Add/edit/delete embeds'
             ],
-            'requires' => 'InputfieldSelector, TextformatterEmbedr, ProcessWire>=3.0.0'
+            'requires' => 'InputfieldSelector, ProcessWire>=3.0.0',
+            'installs' => 'TextformatterEmbedr',
         ];
     }
     

@@ -15,11 +15,10 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr Text Formatter',
-            'version' => '0.2.12',
+            'version' => '0.2.13',
             'summary' => 'Dynamic content blocks embedding - parses ((name)) tags',
             'author' => 'Maxim Alex',
             'icon' => 'code',
-            'installs' => 'ProcessEmbedr',
             'requires' => 'ProcessWire>=3.0.0',
         ];
     }
