@@ -33,10 +33,17 @@ class Embedr extends WireData {
     
     /**
      * Type object
-     * 
+     *
      * @var EmbedrType|null
      */
     protected $typeObject = null;
+
+    /**
+     * Cached debug mode flag (null = not loaded yet)
+     *
+     * @var bool|null
+     */
+    protected $debugMode = null;
     
     /**
      * Construct
@@ -48,7 +55,7 @@ class Embedr extends WireData {
     
     /**
      * Set property
-     * 
+     *
      * @param string $key
      * @param mixed $value
      * @return self|WireData
@@ -59,42 +66,18 @@ class Embedr extends WireData {
             $this->type_id = $value->id;
             return $this;
         }
-        
-        // CRITICAL: Preserve ID - never allow existing ID to be overwritten with 0
+
+        // Prevent an existing ID from being silently reset to 0 (e.g. via setArray with POST data)
         if($key === 'id') {
             $currentId = (int) $this->get('id');
             $newId = (int) $value;
-            
-            // Debug logging if module available
-            $debugMode = false;
-            try {
-                $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-                $debugMode = !empty($config['debugMode']);
-            } catch(\Exception $e) {
-                // Config not accessible, continue without debug
-            }
-            
-            if($debugMode) {
-                $this->wire('log')->save('embedr-debug', sprintf(
-                    '[Embedr::set] ID change attempt | Current=%s, New=%s',
-                    $currentId,
-                    $newId
-                ));
-            }
-            
-            // If we have an existing ID and new value is 0, keep the existing ID
-            if($currentId > 0 && $newId === 0) {
-                if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', '[Embedr::set] BLOCKED - preventing ID reset to 0');
-                }
-                return $this;
-            }
+            if($currentId > 0 && $newId === 0) return $this;
         }
-        
+
         if(isset($this->defaults[$key]) && is_int($this->defaults[$key])) {
             $value = (int) $value;
         }
-        
+
         return parent::set($key, $value);
     }
     
@@ -113,8 +96,24 @@ class Embedr extends WireData {
     }
     
     /**
+     * Lazy-load debug mode from module config (cached per instance)
+     *
+     * @return bool
+     */
+    protected function getDebugMode() {
+        if($this->debugMode !== null) return $this->debugMode;
+        try {
+            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $this->debugMode = !empty($config['debugMode']);
+        } catch(\Exception $e) {
+            $this->debugMode = false;
+        }
+        return $this->debugMode;
+    }
+
+    /**
      * Get type object
-     * 
+     *
      * @return EmbedrType|null
      */
     public function getType() {
@@ -134,193 +133,137 @@ class Embedr extends WireData {
     
     /**
      * Render this embed
-     * 
+     *
      * @return string
      */
     public function render() {
-        // Get debug mode safely without loading Process module
-        $debugMode = false;
-        try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-            $debugMode = !empty($config['debugMode']);
-        } catch(\Exception $e) {
-            // Config not accessible, continue without debug
-        }
-        
-        // Get current user info
+        $debugMode = $this->getDebugMode();
+
         $user = $this->wire('user');
         $userName = $user ? $user->name : 'unknown';
-        $isGuest = $user ? $user->isGuest() : true;
-        
+        $isGuest  = $user ? $user->isGuest() : true;
+
         if($debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
                 '[Embedr::render] Starting | Embed=%s (ID=%s), Selector=%s | User=%s (guest=%s)',
-                $this->name,
-                $this->id,
-                $this->selector,
-                $userName,
-                $isGuest ? 'YES' : 'NO'
+                $this->name, $this->id, $this->selector,
+                $userName, $isGuest ? 'YES' : 'NO'
             ));
         }
-        
+
         $type = $this->getType();
-        
+
         if(!$type) {
-            if($debugMode) {
-                $this->wire('log')->save('embedr-debug', '[Embedr::render] ERROR: Type not found');
-            }
+            if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedr::render] ERROR: Type not found');
             return "<!-- Embedr: Type not found -->";
         }
-        
+
         if($debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
                 '[Embedr::render] Type loaded | Name=%s, Template=%s, Mode=%s',
-                $type->name,
-                $type->template ?: 'none',
-                $type->mode ?: 'array'
+                $type->name, $type->template ?: 'none', $type->mode ?: 'array'
             ));
         }
-        
+
         try {
-            // Execute selector
             if($debugMode) {
-                $this->wire('log')->save('embedr-debug', sprintf(
-                    '[Embedr::render] Executing selector: %s',
-                    $this->selector
-                ));
+                $this->wire('log')->save('embedr-debug', '[Embedr::render] Executing selector: ' . $this->selector);
             }
-            
+
             $items = $this->wire('pages')->find($this->selector);
-            
+
             if($debugMode) {
                 $this->wire('log')->save('embedr-debug', sprintf(
-                    '[Embedr::render] Selector found %d items',
-                    $items->count()
+                    '[Embedr::render] Selector found %d items', $items->count()
                 ));
             }
-            
+
             if(!$items->count()) {
-                if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', '[Embedr::render] No items found - returning empty comment');
-                }
+                if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedr::render] No items found');
                 return "<!-- Embedr: No items found -->";
             }
-            
-            // Check if custom template exists
+
             if($type->template && $type->templateExists()) {
                 $templatePath = $type->getTemplatePath();
-                
+
                 if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedr::render] Using PHP template: %s | Exists: %s',
-                        $templatePath,
-                        file_exists($templatePath) ? 'YES' : 'NO'
-                    ));
+                    $this->wire('log')->save('embedr-debug',
+                        '[Embedr::render] Using PHP template: ' . basename($templatePath)
+                    );
                 }
-                
-                // Use custom PHP template with error handling
+
                 try {
-                    $page = $this->wire('page');
-                    $config = $this->wire('config');
-                    $input = $this->wire('input');
+                    $page      = $this->wire('page');
+                    $config    = $this->wire('config');
+                    $input     = $this->wire('input');
                     $sanitizer = $this->wire('sanitizer');
-                    $embed = $this;
-                    
+                    $embed     = $this;
+
                     ob_start();
-                    
-                    // Wrap include in try-catch to catch template errors
                     try {
                         include $templatePath;
                     } catch(\Throwable $e) {
                         ob_end_clean();
                         throw $e;
                     }
-                    
                     $output = ob_get_clean();
-                    
+
                     if($debugMode) {
                         $this->wire('log')->save('embedr-debug', sprintf(
-                            '[Embedr::render] PHP template rendered (%d chars)',
-                            strlen($output)
+                            '[Embedr::render] PHP template rendered (%d chars)', strlen($output)
                         ));
                     }
-                    
+
                     return $output;
-                    
+
                 } catch(\Throwable $e) {
-                    // Log to both debug log and error log
                     $errorMsg = sprintf(
                         '[Embedr::render] Template ERROR: %s in %s:%d',
-                        $e->getMessage(),
-                        $e->getFile(),
-                        $e->getLine()
+                        $e->getMessage(), $e->getFile(), $e->getLine()
                     );
-                    
-                    if($debugMode) {
-                        $this->wire('log')->save('embedr-debug', $errorMsg);
-                    }
-                    
-                    // Always log errors to separate error log
+                    if($debugMode) $this->wire('log')->save('embedr-debug', $errorMsg);
+
                     $this->wire('log')->save('embedr-errors', sprintf(
                         'Template: %s | Embed: %s | User: %s | Error: %s',
-                        $templatePath,
-                        $this->name,
-                        $this->wire('user')->name,
-                        $e->getMessage()
+                        basename($templatePath), $this->name, $this->wire('user')->name, $e->getMessage()
                     ));
-                    
-                    // Return error comment instead of breaking the page
-                    return sprintf(
-                        "<!-- Embedr Template Error: %s -->",
-                        htmlspecialchars($e->getMessage())
-                    );
+
+                    // Do not expose server path or exception message in public output
+                    return "<!-- Embedr: render error -->";
                 }
+
             } else {
                 if($debugMode) {
                     $reason = $type->template ? 'template file not found' : 'no template specified';
-                    $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedr::render] Using visual renderer (%s)',
-                        $reason
-                    ));
+                    $this->wire('log')->save('embedr-debug', '[Embedr::render] Using visual renderer (' . $reason . ')');
                 }
-                
-                // Use visual renderer
+
                 require_once(__DIR__ . '/EmbedrRenderer.php');
                 $renderer = new EmbedrRenderer($type, $items);
-                $output = $renderer->render();
-                
+                $output   = $renderer->render();
+
                 if($debugMode) {
                     $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedr::render] Visual renderer output (%d chars)',
-                        strlen($output)
+                        '[Embedr::render] Visual renderer output (%d chars)', strlen($output)
                     ));
                 }
-                
+
                 return $output;
             }
-            
+
         } catch(\Exception $e) {
             $errorMsg = sprintf(
                 '[Embedr::render] EXCEPTION: %s in %s:%d',
-                $e->getMessage(),
-                $e->getFile(),
-                $e->getLine()
+                $e->getMessage(), $e->getFile(), $e->getLine()
             );
-            
-            if($debugMode) {
-                $this->wire('log')->save('embedr-debug', $errorMsg);
-            }
-            
-            // Always log to error log
+            if($debugMode) $this->wire('log')->save('embedr-debug', $errorMsg);
+
             $this->wire('log')->save('embedr-errors', sprintf(
                 'Embed: %s | User: %s | Selector: %s | Error: %s',
-                $this->name,
-                $this->wire('user')->name,
-                $this->selector,
-                $e->getMessage()
+                $this->name, $this->wire('user')->name, $this->selector, $e->getMessage()
             ));
-            
-            return "<!-- Embedr Error: {$e->getMessage()} -->";
+
+            return "<!-- Embedr: render error -->";
         }
     }
     

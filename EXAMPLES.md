@@ -835,4 +835,4 @@ if(!$paginatedItems->count()) {
 
 ---
 
-More examples and community templates available in the [Embedr GitHub repository](https://github.com/your-repo/embedr).
+More examples and community templates available in the [Embedr GitHub repository](https://github.com/mxmsmnv/Embedr).

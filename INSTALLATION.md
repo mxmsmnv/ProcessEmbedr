@@ -28,13 +28,13 @@ Upload all files to `/site/modules/Embedr/`:
 
 ```
 /site/modules/Embedr/
-├── ProcessEmbedr.module         (Main admin module)
-├── TextformatterEmbedr.module   (Text formatter)
-├── Embedr.php                   (Single embed class)
-├── Embedrs.php                  (Embed collection)
-├── EmbedrType.php               (Type class)
-├── EmbedrTypes.php              (Type collection)
-└── EmbedrRenderer.php           (Visual renderer)
+├── ProcessEmbedr.module.php         (Main admin module)
+├── TextformatterEmbedr.module.php   (Text formatter)
+├── Embedr.php                       (Single embed class)
+├── Embedrs.php                      (Embed collection)
+├── EmbedrType.php                   (Type class)
+├── EmbedrTypes.php                  (Type collection)
+└── EmbedrRenderer.php               (Visual renderer)
 ```
 
 **Via FTP:**
@@ -76,7 +76,7 @@ chmod 644 site/modules/Embedr/*
 
 ```bash
 cd /path/to/your/site/site/modules
-git clone https://github.com/your-repo/Embedr.git
+git clone https://github.com/mxmsmnv/Embedr.git
 cd Embedr
 chmod 644 *
 ```
@@ -231,11 +231,10 @@ Should show all 7 PHP files.
 ```bash
 chmod 755 site/modules/Embedr
 chmod 644 site/modules/Embedr/*.php
-chmod 644 site/modules/Embedr/*.module
 ```
 
 3. **Check ProcessWire requirements:**
-   - Must have `ProcessEmbedr.module` and `TextformatterEmbedr.module`
+   - Must have `ProcessEmbedr.module.php` and `TextformatterEmbedr.module.php`
    - Files must be valid PHP (no syntax errors)
 
 4. **Check PHP error log** for syntax errors
@@ -253,27 +252,30 @@ chmod 644 site/modules/Embedr/*.module
 1. **Manually create tables** (run in phpMyAdmin or MySQL client):
 
 ```sql
-CREATE TABLE IF NOT EXISTS `embedr` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(128) NOT NULL,
-  `title` varchar(255) NOT NULL DEFAULT '',
-  `type_id` int(10) unsigned NOT NULL DEFAULT 0,
-  `selector` text,
-  PRIMARY KEY (`id`),
+CREATE TABLE IF NOT EXISTS `embedr_types` (
+  `id`       INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name`     VARCHAR(64) NOT NULL,
+  `title`    VARCHAR(255) NOT NULL,
+  `template` VARCHAR(255) DEFAULT '',
+  `icon`     VARCHAR(64) DEFAULT '',
+  `sort`     INT UNSIGNED DEFAULT 0,
+  `mode`     ENUM('once','array') DEFAULT 'array',
+  `config`   TEXT,
   UNIQUE KEY `name` (`name`),
-  KEY `type_id` (`type_id`)
+  KEY `sort` (`sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `embedr_types` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(128) NOT NULL,
-  `title` varchar(255) NOT NULL DEFAULT '',
-  `icon` varchar(64) NOT NULL DEFAULT 'file-text',
-  `template` varchar(255) DEFAULT NULL,
-  `mode` enum('array','single') NOT NULL DEFAULT 'array',
-  `data` text,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+CREATE TABLE IF NOT EXISTS `embedr` (
+  `id`       INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name`     VARCHAR(128) NOT NULL,
+  `title`    VARCHAR(255) NOT NULL,
+  `type_id`  INT UNSIGNED NOT NULL,
+  `selector` TEXT NOT NULL,
+  `created`  INT UNSIGNED NOT NULL,
+  `modified` INT UNSIGNED NOT NULL,
+  UNIQUE KEY `name` (`name`),
+  KEY `type_id` (`type_id`),
+  FOREIGN KEY (`type_id`) REFERENCES `embedr_types`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -332,33 +334,26 @@ Permissions → ☑ embedr-edit
 
 ---
 
-### Issue: 500 error on frontend for guests
+### Issue: Render error on frontend for guests
 
 **Symptoms:**
 - Works for logged-in admin
-- 500 error for guests
-- Error log shows: "You do not have permission to execute this module - ProcessEmbedr"
+- Error or blank output for guests
 
 **Solution:**
 
-**Ensure you're using version 0.2.12 or later.**
-
-This was a known issue in versions < 0.2.12. Update to the latest version.
-
-If still having issues:
-1. Enable Debug Mode
-2. Check Setup → Logs → errors
-3. Check Setup → Logs → embedr-debug
+1. Enable Debug Mode (`Setup → Modules → ProcessEmbedr → Configure`)
+2. Open the failing page as a guest (incognito)
+3. Check `Setup → Logs → embedr-errors` for the full error
+4. Common causes:
+   - Custom template accesses a field without `hasField()` guard
+   - Guest role does not have view permission for the pages in the selector
 
 ---
 
 ## Upgrading
 
-### From 0.2.11 or Earlier
-
-**Important:** Version 0.2.12 fixes critical guest access bug.
-
-**Upgrade steps:**
+### Upgrading to a new version
 
 1. **Backup your database**
 ```bash
@@ -370,28 +365,18 @@ mysqldump -u username -p database_name > backup.sql
 cp -r site/modules/Embedr site/modules/Embedr.backup
 ```
 
-3. **Replace files:**
-   - ProcessEmbedr.module
-   - TextformatterEmbedr.module
-   - Embedr.php
-   - EmbedrType.php
-   - Embedrs.php
+3. **Replace all module files** with the new version
 
 4. **Refresh modules:**
 ```
 Modules → Refresh
 ```
 
-5. **Verify version:**
-```
-Modules → ProcessEmbedr
-Version should show: 0.2.12
-```
+5. **Verify version** in `Modules → ProcessEmbedr`
 
-6. **Test as guest:**
-   - Open site in incognito mode
-   - Verify embeds render
-   - No 500 errors
+6. **Test as guest** — open the site in incognito mode and verify embeds render correctly
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed between versions.
 
 ---
 
@@ -443,14 +428,16 @@ After successful installation:
 
 If installation fails:
 
-1. **Enable Debug Mode**
-2. **Check logs:** Setup → Logs
-3. **Search [ProcessWire forums](https://processwire.com/talk/)**
-4. **Report bugs** with:
-   - ProcessWire version
-   - PHP version
-   - Error messages
-   - Steps to reproduce
+1. **Enable Debug Mode** (`Setup → Modules → ProcessEmbedr → Configure`)
+2. **Check logs:** `Setup → Logs → embedr-debug` and `embedr-errors`
+3. **Open an issue:** [github.com/mxmsmnv/Embedr](https://github.com/mxmsmnv/Embedr)
+4. **Contact the author:** maxim@smnv.org
+
+Include in your report:
+- ProcessWire version
+- PHP version
+- Error messages from the log
+- Steps to reproduce
 
 ---
 

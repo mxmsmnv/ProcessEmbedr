@@ -18,9 +18,9 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr',
-            'version' => '0.2.13',
+            'version' => '0.3.0',
             'summary' => 'Manage dynamic content embeds with live preview',
-            'author' => 'Maxim Alex',
+            'author' => 'Maxim Semenov',
             'href' => 'https://github.com/mxmsmnv/Embedr',
             'icon' => 'code',
             'permission' => 'embedr',
@@ -198,8 +198,11 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             }
         }
         
+        $csrfName  = $this->session->CSRF->getTokenName();
+        $csrfToken = $this->session->CSRF->getTokenValue();
+
         $out = '';
-        
+
         // Render by type sections
         foreach($types as $type) {
             if(!isset($embedsByType[$type->id]) || count($embedsByType[$type->id]) === 0) {
@@ -238,16 +241,19 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
                 $count = $embed->getCount();
                 $countClass = $count > 0 ? 'text-success' : 'text-muted';
                 
-                $shortcode = "<code>{$this->openTag}{$embed->name}{$this->closeTag}</code> " .
-                    "<a href='#' class='copy-shortcode' data-shortcode='{$this->openTag}{$embed->name}{$this->closeTag}'>" .
+                $shortcodeVal  = $this->openTag . $embed->name . $this->closeTag;
+                $safeScAttr    = htmlspecialchars($shortcodeVal, ENT_QUOTES, 'UTF-8');
+                $shortcode = "<code>{$safeScAttr}</code> " .
+                    "<a href='#' class='copy-shortcode' data-shortcode='{$safeScAttr}'>" .
                     "<i class='fa fa-copy'></i></a>";
                 
                 $modified = date('Y-m-d H:i', $embed->modified);
                 
-                // Actions column with delete button
-                $actions = "<a href='./delete/?id={$embed->id}' " .
+                // Actions column with delete button (CSRF token in URL, confirm via data attribute)
+                $safeTitle = htmlspecialchars($embed->title, ENT_QUOTES, 'UTF-8');
+                $actions = "<a href='./delete/?id={$embed->id}&{$csrfName}={$csrfToken}' " .
                     "class='delete-embed' " .
-                    "onclick='return confirm(\"Delete embed \\\"{$embed->title}\\\"?\")' " .
+                    "data-confirm='Delete embed \"{$safeTitle}\"?' " .
                     "title='Delete'>" .
                     "<i class='fa fa-trash'></i></a>";
                 
@@ -294,16 +300,19 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
                 $count = $embed->getCount();
                 $countClass = $count > 0 ? 'text-success' : 'text-muted';
                 
-                $shortcode = "<code>{$this->openTag}{$embed->name}{$this->closeTag}</code> " .
-                    "<a href='#' class='copy-shortcode' data-shortcode='{$this->openTag}{$embed->name}{$this->closeTag}'>" .
+                $shortcodeVal  = $this->openTag . $embed->name . $this->closeTag;
+                $safeScAttr    = htmlspecialchars($shortcodeVal, ENT_QUOTES, 'UTF-8');
+                $shortcode = "<code>{$safeScAttr}</code> " .
+                    "<a href='#' class='copy-shortcode' data-shortcode='{$safeScAttr}'>" .
                     "<i class='fa fa-copy'></i></a>";
                 
                 $modified = date('Y-m-d H:i', $embed->modified);
                 
-                // Actions column with delete button
-                $actions = "<a href='./delete/?id={$embed->id}' " .
+                // Actions column with delete button (CSRF token in URL, confirm via data attribute)
+                $safeTitle = htmlspecialchars($embed->title, ENT_QUOTES, 'UTF-8');
+                $actions = "<a href='./delete/?id={$embed->id}&{$csrfName}={$csrfToken}' " .
                     "class='delete-embed' " .
-                    "onclick='return confirm(\"Delete embed \\\"{$embed->title}\\\"?\")' " .
+                    "data-confirm='Delete embed \"{$safeTitle}\"?' " .
                     "title='Delete'>" .
                     "<i class='fa fa-trash'></i></a>";
                 
@@ -384,7 +393,7 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
         // Add grouped tables
         $output .= $out;
         
-        // Add JavaScript for copy functionality
+        // Add JavaScript for copy and delete confirmation
         $output .= "
         <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -395,10 +404,14 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
                     navigator.clipboard.writeText(shortcode).then(function() {
                         var icon = el.querySelector('i');
                         icon.className = 'fa fa-check';
-                        setTimeout(function() {
-                            icon.className = 'fa fa-copy';
-                        }, 2000);
+                        setTimeout(function() { icon.className = 'fa fa-copy'; }, 2000);
                     });
+                });
+            });
+            document.querySelectorAll('.delete-embed').forEach(function(el) {
+                el.addEventListener('click', function(e) {
+                    var msg = this.dataset.confirm || 'Delete this item?';
+                    if(!confirm(msg)) e.preventDefault();
                 });
             });
         });
@@ -566,14 +579,15 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             $f->label = 'Shortcode';
             $f->description = 'Copy this code to use in your content';
             
-            $shortcode = $embed->getShortcode();
+            $shortcode     = $embed->getShortcode();
+            $safeShortcode = htmlspecialchars($shortcode, ENT_QUOTES, 'UTF-8');
             $f->value = "
-                <div class='uk-form-horizontal'>
-                    <input type='text' value='{$shortcode}' readonly 
-                           style='font-family: monospace; font-size: 14px; padding: 10px;'
+                <div class='uk-flex uk-flex-middle' style='gap: 8px;'>
+                    <input type='text' value='{$safeShortcode}' readonly
+                           style='font-family: monospace; font-size: 14px; padding: 10px; flex: 1;'
                            onclick='this.select()'>
-                    <button type='button' class='uk-button uk-button-small' 
-                            onclick='navigator.clipboard.writeText(\"{$shortcode}\"); this.textContent=\"Copied!\"; var btn=this; setTimeout(function(){btn.textContent=\"Copy\";}, 2000);'>
+                    <button type='button' class='uk-button uk-button-small'
+                            onclick='var inp=this.previousElementSibling; navigator.clipboard.writeText(inp.value); this.textContent=\"Copied!\"; var btn=this; setTimeout(function(){{btn.textContent=\"Copy\";}}, 2000);'>
                         Copy
                     </button>
                 </div>
@@ -667,10 +681,16 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     
     /**
      * Execute delete - delete embed from list
-     * 
+     *
      * @return string
      */
     public function ___executeDelete() {
+        if(!$this->session->CSRF->validate()) {
+            $this->error("Invalid security token");
+            $this->session->redirect('../');
+            return '';
+        }
+
         $id = (int) $this->input->get('id');
         if(!$id) {
             $this->error("No ID provided");
@@ -695,13 +715,16 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     
     /**
      * Execute types - manage types
-     * 
+     *
      * @return string
      */
     public function ___executeTypes() {
         $this->breadcrumb('../', 'Embedr');
         $this->headline('Manage Types');
-        
+
+        $csrfName  = $this->session->CSRF->getTokenName();
+        $csrfToken = $this->session->CSRF->getTokenValue();
+
         $types = $this->types->getAll(true);
         
         // Build table
@@ -740,8 +763,12 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             $mode = $type->mode ?: 'array';
             $modeDisplay = $mode === 'once' ? 'Once' : 'Array';
             
+            $safeTypeTitle = htmlspecialchars($type->title, ENT_QUOTES, 'UTF-8');
             $actions = "<a href='../type-edit/?id={$type->id}'><i class='fa fa-edit'></i> Edit</a> | " .
-                      "<a href='../type-delete/?id={$type->id}' class='uk-text-danger'><i class='fa fa-trash'></i> Delete</a>";
+                      "<a href='../type-delete/?id={$type->id}&{$csrfName}={$csrfToken}' " .
+                      "class='delete-embed uk-text-danger' " .
+                      "data-confirm='Delete type \"{$safeTypeTitle}\"?'>" .
+                      "<i class='fa fa-trash'></i> Delete</a>";
             
             $table->row([
                 "<a href='../type-edit/?id={$type->id}'><strong>{$type->name}</strong></a>",
@@ -782,10 +809,22 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
         }
         
         $out .= $table->render();
-        
+
+        $out .= "
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.delete-embed').forEach(function(el) {
+                el.addEventListener('click', function(e) {
+                    var msg = this.dataset.confirm || 'Delete this item?';
+                    if(!confirm(msg)) e.preventDefault();
+                });
+            });
+        });
+        </script>";
+
         return $out;
     }
-    
+
     /**
      * Execute type-edit - add/edit type
      * 
@@ -843,8 +882,8 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
         $f->attr('name', 'type_template');
         $f->label = 'Template File';
         $f->description = "Filename in {$this->componentsPath}";
-        $f->notes = "Example: product.php";
-        $f->required = true;
+        $f->notes = "Example: product.php — leave blank to use the visual card renderer";
+        $f->required = false;
         $f->value = $type->template;
         $f->columnWidth = 70;
         $form->add($f);
@@ -904,10 +943,16 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     
     /**
      * Execute type-delete - delete type
-     * 
+     *
      * @return string
      */
     public function ___executeTypeDelete() {
+        if(!$this->session->CSRF->validate()) {
+            $this->error("Invalid security token");
+            $this->session->redirect('../types/');
+            return '';
+        }
+
         $id = (int) $this->input->get('id');
         $type = $this->types->getById($id);
         

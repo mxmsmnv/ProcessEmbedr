@@ -1,9 +1,9 @@
 # Embedr Module for ProcessWire
 
-**Version:** 0.2.13  
-**Author:** Maxim Alex
+**Author:** [Maxim Semenov](https://smnv.org) — maxim@smnv.org  
 **License:** MIT  
-**ProcessWire:** 3.0+
+**ProcessWire:** 3.0+  
+**Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 Dynamic content embed management system with live preview, custom PHP templates, and visual card builder for ProcessWire CMS.
 
@@ -159,11 +159,8 @@ Types define reusable configurations for similar embeds.
 Name: articles
 Title: Article Lists
 Icon: file-text
-Template: articles.php
+Template: articles.php   ← optional; leave blank to use the visual renderer
 Mode: array
-Card Width: 400px
-Image Width: 192
-Image Height: 192
 ```
 
 ### Creating Embeds
@@ -294,32 +291,20 @@ $isGuest = $user->isGuest();
 
 ## Visual Card Renderer
 
-When no PHP template is specified, Embedr uses the built-in visual renderer.
+When no PHP template is specified, Embedr uses the built-in visual renderer powered by UIKit CSS classes.
 
-### Configuration
+### Default settings
 
-Configure card appearance in the Type settings:
+| Setting | Default | Options |
+|---|---|---|
+| Layout | `grid` | `grid`, `list`, `table` |
+| Columns | `6` | `2`, `3`, `4`, `6` |
+| Image size | `192×192px` | configured per type via `config` JSON |
+| Links | enabled | — |
 
-**Layout:**
-- Card Width: 400px (default)
-- Image Aspect Ratio: 1:1, 16:9, 4:3, etc.
-- Grid Columns: 1-6 columns
-- Gap Size: small, medium, large
+The grid is fully responsive: 2 columns on small screens, scaling up to the configured maximum on large screens.
 
-**Card Sections:**
-- ☑ Show Image
-- ☑ Show Title
-- ☑ Show Summary
-- ☑ Show Link
-
-**Image Settings:**
-- Width: 192px (default)
-- Height: 192px (default)
-- Crop: true/false
-
-**Styling:**
-- UIKit CSS classes
-- Custom CSS support
+> For custom image sizes, markup, or styling — create a **PHP template** instead (see [Custom PHP Templates](#custom-php-templates)). The visual renderer is intended as a zero-config fallback.
 
 ---
 
@@ -436,15 +421,16 @@ Shows:
 - Check path: `Setup → Modules → ProcessEmbedr → Components Path`
 - Set permissions: `chmod 644 template.php`
 
-#### 3. 500 Error for guests
+#### 3. Render error for guests
 
 **Cause:**
-- Old module version (< 0.2.12)
+- PHP error inside a custom template (field access without `hasField()` check)
+- Guest does not have view permissions for the pages matched by the selector
 
 **Solution:**
-- Upgrade to v0.2.12+
-- Check `errors` log for details
-- Enable Debug Mode for full log
+- Enable Debug Mode and check `embedr-errors` log for the exact error
+- Add `$page->hasField('fieldname')` guards in your PHP template
+- Check page view permissions: `Access → Templates → [Template] → View pages`
 
 #### 4. No items found
 ```html
@@ -542,7 +528,7 @@ $type->name         // string - Unique name
 $type->title        // string - Display title
 $type->icon         // string - FA icon name
 $type->template     // string - PHP template filename
-$type->mode         // string - 'array' or 'single'
+$type->mode         // string - 'array' or 'once'
 ```
 
 **Methods:**
@@ -637,21 +623,24 @@ limit=1000     // Too many results
 
 ## Support
 
+**Author:** [Maxim Semenov](https://smnv.org)  
+**Email:** maxim@smnv.org  
+**GitHub:** [github.com/mxmsmnv/Embedr](https://github.com/mxmsmnv/Embedr)
+
 ### Reporting Bugs
 
-Include:
+Please include:
 - ProcessWire version
 - Embedr version
 - PHP version
-- Debug log output
+- Debug log output (`Setup → Logs → embedr-debug`)
 - Steps to reproduce
-- Expected vs actual behavior
-
+- Expected vs actual behaviour
 
 ---
 
 ## License
 
-MIT License - Free to use in personal and commercial projects.
+MIT License — free to use in personal and commercial projects.
 
 ---

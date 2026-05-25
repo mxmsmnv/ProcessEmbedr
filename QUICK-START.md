@@ -204,9 +204,10 @@ Selector: template=article, tags=$page->tags, id!=$page->id, limit=3
 
 **Fix:** Selector matches no pages, adjust selector
 
-### 500 Error for guests?
+### Render error for guests?
 
-**Fix:** Upgrade to v0.2.12+ (critical fix for guest access)
+**Fix:** Enable Debug Mode, open page in incognito, check `Setup → Logs → embedr-errors`.
+Common cause: custom template accesses a field without `hasField()` guard.
 
 ---
 

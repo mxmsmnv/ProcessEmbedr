@@ -17,14 +17,37 @@ class Embedrs extends Wire {
     
     /**
      * Cache of all embeds
-     * 
+     *
      * @var WireArray|null
      */
     protected $embeds = null;
+
+    /**
+     * Cached debug mode flag (null = not loaded yet)
+     *
+     * @var bool|null
+     */
+    protected $debugMode = null;
     
     /**
+     * Lazy-load debug mode from module config (cached per instance)
+     *
+     * @return bool
+     */
+    protected function getDebugMode() {
+        if($this->debugMode !== null) return $this->debugMode;
+        try {
+            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $this->debugMode = !empty($config['debugMode']);
+        } catch(\Exception $e) {
+            $this->debugMode = false;
+        }
+        return $this->debugMode;
+    }
+
+    /**
      * Get database table name
-     * 
+     *
      * @return string
      */
     public function getTable() {
@@ -157,160 +180,120 @@ class Embedrs extends Wire {
     
     /**
      * Save embed
-     * 
+     *
      * @param Embedr $embed
      * @return bool|int Returns ID on success, false on failure
      */
     public function save(Embedr $embed) {
-        $database = $this->wire('database');
-        $table = self::TABLE_NAME;
-        
-        // Get debug mode safely without loading Process module
-        $debugMode = false;
-        try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-            $debugMode = !empty($config['debugMode']);
-        } catch(\Exception $e) {
-            // Config not accessible, continue without debug
-        }
-        
+        $database  = $this->wire('database');
+        $table     = self::TABLE_NAME;
+        $debugMode = $this->getDebugMode();
+
         if($debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
                 '[Embedrs::save] Starting | ID=%s, Name=%s',
-                $embed->id ?: 'new',
-                $embed->name
+                $embed->id ?: 'new', $embed->name
             ));
         }
-        
+
         // Validate
         $valid = $embed->validate();
         if($valid !== true) {
-            if($debugMode) {
-                $this->wire('log')->save('embedr-debug', '[Embedrs::save] Validation failed: ' . $valid);
-            }
+            if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedrs::save] Validation failed: ' . $valid);
             $this->error($valid);
             return false;
         }
-        
-        // Sanitize
-        $name = $this->wire('sanitizer')->name($embed->name);
-        $title = $this->wire('sanitizer')->text($embed->title);
-        $type_id = (int) $embed->type_id;
-        $selector = $this->wire('sanitizer')->text($embed->selector);
-        
+
+        // Sanitize — use textarea() for selector to avoid the 255-char truncation of text()
+        $name     = $this->wire('sanitizer')->name($embed->name);
+        $title    = $this->wire('sanitizer')->text($embed->title);
+        $type_id  = (int) $embed->type_id;
+        $selector = $this->wire('sanitizer')->textarea($embed->selector);
+
         if($debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
-                '[Embedrs::save] After sanitize | Name=%s, TypeID=%s',
-                $name,
-                $type_id
+                '[Embedrs::save] After sanitize | Name=%s, TypeID=%s', $name, $type_id
             ));
         }
-        
+
         try {
             if($embed->id) {
                 if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', '[Embedrs::save] UPDATE mode - ID exists: ' . $embed->id);
+                    $this->wire('log')->save('embedr-debug', '[Embedrs::save] UPDATE mode - ID: ' . $embed->id);
                 }
-                
-                // Update existing - check if name changed
+
                 $query = $database->prepare("SELECT name FROM `$table` WHERE id = :id");
                 $query->execute([':id' => $embed->id]);
                 $oldName = $query->fetchColumn();
-                
+
                 if($debugMode) {
                     $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedrs::save] Old name from DB: %s, New name: %s',
-                        $oldName,
-                        $name
+                        '[Embedrs::save] Old name: %s, New name: %s', $oldName, $name
                     ));
                 }
-                
-                // Only check duplicates if name actually changed
+
                 if($oldName !== $name) {
                     $query = $database->prepare("SELECT COUNT(*) FROM `$table` WHERE name = :name AND id != :id");
                     $query->execute([':name' => $name, ':id' => $embed->id]);
                     if($query->fetchColumn() > 0) {
-                        if($debugMode) {
-                            $this->wire('log')->save('embedr-debug', '[Embedrs::save] Duplicate name detected');
-                        }
+                        if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedrs::save] Duplicate name detected');
                         $this->error("An embed with the name '{$name}' already exists");
                         return false;
                     }
                 }
-                
-                // Update existing
-                $sql = "UPDATE `$table` SET 
-                    `name` = :name,
-                    `title` = :title,
-                    `type_id` = :type_id,
-                    `selector` = :selector,
-                    `modified` = :modified
+
+                $sql = "UPDATE `$table` SET
+                    `name` = :name, `title` = :title, `type_id` = :type_id,
+                    `selector` = :selector, `modified` = :modified
                     WHERE `id` = :id";
-                
+
                 $query = $database->prepare($sql);
                 $query->execute([
-                    ':id' => $embed->id,
-                    ':name' => $name,
-                    ':title' => $title,
-                    ':type_id' => $type_id,
-                    ':selector' => $selector,
-                    ':modified' => time(),
+                    ':id' => $embed->id, ':name' => $name, ':title' => $title,
+                    ':type_id' => $type_id, ':selector' => $selector, ':modified' => time(),
                 ]);
-                
+
                 if($debugMode) {
                     $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedrs::save] UPDATE completed | ID=%s, Title=%s',
-                        $embed->id,
-                        $title
+                        '[Embedrs::save] UPDATE completed | ID=%s, Title=%s', $embed->id, $title
                     ));
                 }
-                
-                $this->embeds = null; // Clear cache
+
+                $this->embeds = null;
                 $this->message("Embed '{$title}' updated");
                 return $embed->id;
-                
+
             } else {
-                if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', '[Embedrs::save] INSERT mode - creating new embed');
-                }
-                
-                // Insert new
-                $sql = "INSERT INTO `$table` 
-                    (`name`, `title`, `type_id`, `selector`, `created`, `modified`) 
+                if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedrs::save] INSERT mode - new embed');
+
+                $sql = "INSERT INTO `$table`
+                    (`name`, `title`, `type_id`, `selector`, `created`, `modified`)
                     VALUES (:name, :title, :type_id, :selector, :created, :modified)";
-                
+
                 $now = time();
                 $query = $database->prepare($sql);
                 $query->execute([
-                    ':name' => $name,
-                    ':title' => $title,
-                    ':type_id' => $type_id,
-                    ':selector' => $selector,
-                    ':created' => $now,
-                    ':modified' => $now,
+                    ':name' => $name, ':title' => $title, ':type_id' => $type_id,
+                    ':selector' => $selector, ':created' => $now, ':modified' => $now,
                 ]);
-                
-                $embed->id = (int) $database->lastInsertId();
-                $embed->created = $now;
+
+                $embed->id       = (int) $database->lastInsertId();
+                $embed->created  = $now;
                 $embed->modified = $now;
-                
+
                 if($debugMode) {
                     $this->wire('log')->save('embedr-debug', sprintf(
-                        '[Embedrs::save] INSERT completed | New ID=%s, Title=%s',
-                        $embed->id,
-                        $title
+                        '[Embedrs::save] INSERT completed | New ID=%s, Title=%s', $embed->id, $title
                     ));
                 }
-                
-                $this->embeds = null; // Clear cache
+
+                $this->embeds = null;
                 $this->message("Embed '{$title}' created");
                 return $embed->id;
             }
-            
+
         } catch(\Exception $e) {
-            if($debugMode) {
-                $this->wire('log')->save('embedr-debug', '[Embedrs::save] EXCEPTION: ' . $e->getMessage());
-            }
+            if($debugMode) $this->wire('log')->save('embedr-debug', '[Embedrs::save] EXCEPTION: ' . $e->getMessage());
             $this->error("Error saving embed: " . $e->getMessage());
             return false;
         }

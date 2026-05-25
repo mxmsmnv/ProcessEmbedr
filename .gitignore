@@ -48,3 +48,29 @@ yarn-error.log
 
 # Module specific - exclude config if needed
 # config.php
+
+# AI assistant data — may contain session history, API keys, memory files
+.claude/
+.codex/
+.cursor/
+.aider/
+.aider.chat.history.md
+.aider.input.history
+.continue/
+.cody/
+.copilot/
+.github/copilot/
+.tabnine/
+.supermaven/
+.codeium/
+.qodo/
+.aws-q/
+.amazonq/
+.windsurf/
+.zed-ai/
+.openai/
+.anthropic/
+*.claude
+*.cursorrules
+.cursorignore
+AGENTS.md

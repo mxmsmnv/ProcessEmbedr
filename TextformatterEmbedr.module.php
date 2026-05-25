@@ -15,9 +15,9 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr Text Formatter',
-            'version' => '0.2.13',
+            'version' => '0.3.0',
             'summary' => 'Dynamic content blocks embedding - parses ((name)) tags',
-            'author' => 'Maxim Alex',
+            'author' => 'Maxim Semenov',
             'icon' => 'code',
             'requires' => 'ProcessWire>=3.0.0',
         ];
@@ -66,10 +66,24 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     
     /**
      * Embedrs collection
-     * 
+     *
      * @var Embedrs|null
      */
     protected $embedrs = null;
+
+    /**
+     * Whether ProcessEmbedr config has been loaded into this instance
+     *
+     * @var bool
+     */
+    protected $configLoaded = false;
+
+    /**
+     * Cached debug mode flag
+     *
+     * @var bool
+     */
+    protected $debugMode = false;
     
     /**
      * Construct
@@ -112,8 +126,25 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     }
     
     /**
+     * Load config from ProcessEmbedr (primary source) once per instance.
+     * Falls back to own saved values or hard-coded defaults.
+     */
+    protected function loadConfig() {
+        if($this->configLoaded) return;
+        try {
+            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            if(!empty($config['openTag']))  $this->openTag  = $config['openTag'];
+            if(!empty($config['closeTag'])) $this->closeTag = $config['closeTag'];
+            $this->debugMode = !empty($config['debugMode']);
+        } catch(\Exception $e) {
+            // ProcessEmbedr not available — keep own defaults
+        }
+        $this->configLoaded = true;
+    }
+
+    /**
      * Format value (when Page/Field not known)
-     * 
+     *
      * @param string $str
      */
     public function format(&$str) {
@@ -124,162 +155,132 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     
     /**
      * Format value
-     * 
+     *
      * @param Page $page
      * @param Field $field
      * @param string $value
      */
     public function formatValue(Page $page, Field $field, &$value) {
-        $openTag = $this->openTag;
+        $this->loadConfig();
+
+        $openTag  = $this->openTag;
         $closeTag = $this->closeTag;
-        
-        // Get debug mode safely without loading Process module
-        $debugMode = false;
-        try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-            $debugMode = !empty($config['debugMode']);
-        } catch(\Exception $e) {
-            // Config not accessible, continue without debug
-        }
-        
-        if($debugMode) {
+
+        if($this->debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
                 '[TextformatterEmbedr::formatValue] Called | Page=%s, User=%s',
                 $page->id ? $page->path : 'unknown',
                 $this->wire('user')->name
             ));
         }
-        
-        // Exit early when possible
+
         if(strpos($value, $openTag) === false) return;
         if(strpos($value, $closeTag) === false) return;
-        
-        // Build regex pattern
-        // Matches: ((name)) with optional surrounding HTML tags
+
+        // Matches ((name)) with optional surrounding HTML wrapper tag
         $regex = '!' .
-            '(?:<([a-zA-Z]+)' .         // 1=optional HTML open tag
-            '[^>]*>[\s\r\n]*)?' .       // HTML open tag attributes and whitespace
-            preg_quote($openTag, '!') . // Embedr open tag ((
-            '([a-z0-9_-]+)' .           // 2=embed name
-            preg_quote($closeTag, '!') .// Embedr close tag ))
-            '(?:[\s\r\n]*</(\1)>)?' .   // 3=optional close HTML tag
+            '(?:<([a-zA-Z]+)[^>]*>[\s\r\n]*)?' .
+            preg_quote($openTag, '!') .
+            '([a-z0-9_-]+)' .
+            preg_quote($closeTag, '!') .
+            '(?:[\s\r\n]*</(\1)>)?' .
             '!i';
-        
+
         if(!preg_match_all($regex, $value, $matches)) return;
-        
-        if($debugMode) {
+
+        if($this->debugMode) {
             $this->wire('log')->save('embedr-debug', sprintf(
                 '[TextformatterEmbedr::formatValue] Found %d embed(s): %s',
-                count($matches[2]),
-                implode(', ', $matches[2])
+                count($matches[2]), implode(', ', $matches[2])
             ));
         }
-        
-        $prevPage = $this->page;
+
+        $prevPage  = $this->page;
         $prevField = $this->field;
         $prevValue = $this->value;
-        
-        $this->page = $page;
+
+        $this->page  = $page;
         $this->field = $field;
         $this->value = $value;
-        
-        // Process each match
+
         foreach($matches[2] as $key => $name) {
             $name = $this->wire('sanitizer')->name($name);
             if(!$name) continue;
-            
+
             $replacement = $this->getReplacement($name);
             if($replacement === false) continue;
-            
-            $openHTML = $matches[1][$key];
+
+            $openHTML  = $matches[1][$key];
             $closeHTML = $matches[3][$key];
-            
-            // Consume surrounding <p> tags if they match
+
+            // Strip surrounding <p> wrapper if it exists
             if($openHTML && $openHTML === $closeHTML && strtolower($openHTML) === 'p') {
                 $this->value = str_replace($matches[0][$key], $replacement, $this->value);
             } else {
-                // Just replace the tag itself
                 $this->value = str_replace("$openTag$name$closeTag", $replacement, $this->value);
             }
         }
-        
+
         $value = $this->value;
-        
+
         $this->value = $prevValue;
-        $this->page = $prevPage;
+        $this->page  = $prevPage;
         $this->field = $prevField;
     }
     
     /**
      * Get replacement for embed name
-     * 
+     *
      * @param string $name
      * @return string|false
      */
     protected function getReplacement($name) {
-        // Get debug mode safely without loading Process module
-        $debugMode = false;
-        try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-            $debugMode = !empty($config['debugMode']);
-        } catch(\Exception $e) {
-            // Config not accessible, continue without debug
-        }
-        
+        $debugMode = $this->debugMode;
+
         if($debugMode) {
-            $this->wire('log')->save('embedr-debug', sprintf(
-                '[TextformatterEmbedr::getReplacement] Looking for embed: %s',
-                $name
-            ));
+            $this->wire('log')->save('embedr-debug',
+                '[TextformatterEmbedr::getReplacement] Looking for embed: ' . $name
+            );
         }
-        
+
         try {
             $embedrs = $this->embedrs();
-            $embed = $embedrs->get($name);
-            
+            $embed   = $embedrs->get($name);
+
             if(!$embed || !$embed->id) {
                 if($debugMode) {
-                    $this->wire('log')->save('embedr-debug', sprintf(
-                        '[TextformatterEmbedr::getReplacement] Embed NOT FOUND: %s',
-                        $name
-                    ));
+                    $this->wire('log')->save('embedr-debug',
+                        '[TextformatterEmbedr::getReplacement] Embed NOT FOUND: ' . $name
+                    );
                 }
                 return "<!-- Embedr: '{$name}' not found -->";
             }
-            
+
             if($debugMode) {
                 $this->wire('log')->save('embedr-debug', sprintf(
                     '[TextformatterEmbedr::getReplacement] Embed found | ID=%s, Name=%s, Type=%s',
-                    $embed->id,
-                    $embed->name,
-                    $embed->type ? $embed->type->name : 'unknown'
+                    $embed->id, $embed->name, $embed->type ? $embed->type->name : 'unknown'
                 ));
             }
-            
+
             $rendered = $embed->render();
-            
+
             if($debugMode) {
-                $renderedPreview = substr(strip_tags($rendered), 0, 100);
                 $this->wire('log')->save('embedr-debug', sprintf(
                     '[TextformatterEmbedr::getReplacement] Rendered (%d chars): %s...',
-                    strlen($rendered),
-                    $renderedPreview
+                    strlen($rendered), substr(strip_tags($rendered), 0, 100)
                 ));
             }
-            
+
             return $rendered;
-            
+
         } catch(\Exception $e) {
-            // Log error if debug enabled
             if($debugMode) {
-                $this->wire('log')->save('embedr-debug', sprintf(
-                    '[TextformatterEmbedr::getReplacement] EXCEPTION: %s',
-                    $e->getMessage()
-                ));
+                $this->wire('log')->save('embedr-debug',
+                    '[TextformatterEmbedr::getReplacement] EXCEPTION: ' . $e->getMessage()
+                );
             }
-            
-            // Return error comment instead of throwing
-            return "<!-- Embedr Error: {$e->getMessage()} -->";
+            return "<!-- Embedr: render error -->";
         }
     }
     
@@ -305,7 +306,7 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
      * @param Field|null $field
      * @return string
      */
-    public function render($value, Page $page = null, Field $field = null) {
+    public function render($value, ?Page $page = null, ?Field $field = null) {
         if(is_null($page)) $page = $this->wire('page');
         if(is_null($field)) $field = $this->wire(new Field());
         
@@ -315,34 +316,21 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     
     /**
      * Module configuration
-     * 
+     *
      * @param array $data
      * @return InputfieldWrapper
      */
     public static function getModuleConfigInputfields(array $data) {
         $inputfields = new InputfieldWrapper();
         $modules = wire('modules');
-        
-        // Open tag
-        $f = $modules->get('InputfieldText');
-        $f->attr('name', 'openTag');
-        $f->label = 'Opening Tag';
-        $f->description = 'Tag that starts an embed';
-        $f->notes = 'Default: ((';
-        $f->value = isset($data['openTag']) ? $data['openTag'] : self::defaultOpenTag;
-        $f->columnWidth = 50;
+
+        // Tags are now managed exclusively in ProcessEmbedr settings
+        $f = $modules->get('InputfieldMarkup');
+        $f->label = 'Tag Configuration';
+        $f->value = '<p class="uk-text-meta">Opening and closing tags are configured in ' .
+            '<a href="../ProcessEmbedr/">Embedr module settings</a> and applied here automatically.</p>';
         $inputfields->add($f);
-        
-        // Close tag
-        $f = $modules->get('InputfieldText');
-        $f->attr('name', 'closeTag');
-        $f->label = 'Closing Tag';
-        $f->description = 'Tag that ends an embed';
-        $f->notes = 'Default: ))';
-        $f->value = isset($data['closeTag']) ? $data['closeTag'] : self::defaultCloseTag;
-        $f->columnWidth = 50;
-        $inputfields->add($f);
-        
+
         // Usage instructions
         $f = $modules->get('InputfieldMarkup');
         $f->label = 'How to Use';
