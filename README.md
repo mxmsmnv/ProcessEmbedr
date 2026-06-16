@@ -1,6 +1,7 @@
 # Embedr Module for ProcessWire
 
 **Author:** [Maxim Semenov](https://smnv.org) — maxim@smnv.org  
+If this project helps your work, consider supporting future development: [GitHub Sponsors](https://github.com/sponsors/mxmsmnv) or [smnv.org/sponsor](https://smnv.org/sponsor/).  
 **License:** MIT  
 **ProcessWire:** 3.0+  
 **Changelog:** [CHANGELOG.md](CHANGELOG.md)
