@@ -18,6 +18,7 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
             'version' => '0.3.0',
             'summary' => 'Dynamic content blocks embedding - parses ((name)) tags',
             'author' => 'Maxim Semenov',
+            'href'     => 'https://smnv.org',
             'icon' => 'code',
             'requires' => 'ProcessWire>=3.0.0',
         ];

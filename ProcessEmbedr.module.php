@@ -21,7 +21,7 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             'version' => '0.3.0',
             'summary' => 'Manage dynamic content embeds with live preview',
             'author' => 'Maxim Semenov',
-            'href' => 'https://github.com/mxmsmnv/Embedr',
+            'href' => 'https://smnv.org',
             'icon' => 'code',
             'permission' => 'embedr',
             'permissions' => [
