@@ -41,8 +41,8 @@ Dynamic content embed management system with live preview, custom PHP templates,
 1. **Upload module files** to `/site/modules/Embedr/`:
 ```
 /site/modules/Embedr/
-├── ProcessEmbedr.module.php
-├── TextformatterEmbedr.module.php
+├── ProcessEmbedr.module
+├── TextformatterEmbedr.module
 ├── Embedr.php
 ├── Embedrs.php
 ├── EmbedrType.php

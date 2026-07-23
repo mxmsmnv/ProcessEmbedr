@@ -5,6 +5,11 @@ Format: [SemVer](https://semver.org) — newest first.
 
 ---
 
+## [0.3.1] — 2026-07-23
+
+### Fixed
+- Restored the `.module` filenames used by existing ProcessWire installations so module refreshes keep `ProcessEmbedr` and `TextformatterEmbedr` registered during upgrades.
+
 ## [0.3.0] — 2026-05-25
 
 ### Security

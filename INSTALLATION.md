@@ -28,8 +28,8 @@ Upload all files to `/site/modules/Embedr/`:
 
 ```
 /site/modules/Embedr/
-├── ProcessEmbedr.module.php         (Main admin module)
-├── TextformatterEmbedr.module.php   (Text formatter)
+├── ProcessEmbedr.module             (Main admin module)
+├── TextformatterEmbedr.module       (Text formatter)
 ├── Embedr.php                       (Single embed class)
 ├── Embedrs.php                      (Embed collection)
 ├── EmbedrType.php                   (Type class)
@@ -234,7 +234,7 @@ chmod 644 site/modules/Embedr/*.php
 ```
 
 3. **Check ProcessWire requirements:**
-   - Must have `ProcessEmbedr.module.php` and `TextformatterEmbedr.module.php`
+   - Must have `ProcessEmbedr.module` and `TextformatterEmbedr.module`
    - Files must be valid PHP (no syntax errors)
 
 4. **Check PHP error log** for syntax errors
