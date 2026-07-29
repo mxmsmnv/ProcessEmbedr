@@ -71,12 +71,12 @@ class EmbedrType extends WireData {
     public function getTemplatePath() {
         $config = $this->wire('config');
         
-        // Get components path from ProcessEmbedr module settings
+        // Get components path from the core Embedr module settings
         // Use getModuleConfigData to avoid permission issues for guests
         $componentsPath = 'components/'; // Default
         
         try {
-            $moduleConfig = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $moduleConfig = $this->wire('modules')->getModuleConfigData('Embedr');
             if(!empty($moduleConfig['componentsPath'])) {
                 $componentsPath = $moduleConfig['componentsPath'];
             }

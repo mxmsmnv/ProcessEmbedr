@@ -5,6 +5,28 @@ Format: [SemVer](https://semver.org) — newest first.
 
 ---
 
+## [0.4.0] — 2026-07-28
+
+### Added
+- Added `Embedr.module.php` as the singular core API and configuration module.
+- Added `Embedr::renderField()` for cached, template-driven rendering of
+  FieldtypeTable, Repeater, PageTable, Page Reference, and custom iterable
+  fields.
+- Added the public `render()`, `getEmbed()`, `embeds()`, and `types()` API.
+
+### Changed
+- `ProcessEmbedr` is now an admin-only Process module and reads configuration
+  from the core `Embedr` module.
+- Renamed the single embed value object from `Embedr` to `EmbedrItem` to avoid
+  colliding with the core module class.
+- `TextformatterEmbedr` now reads shortcode settings and collections from
+  `Embedr`.
+- Existing database tables and stored embeds are reused without schema changes.
+
+### Migration
+- Installing `Embedr` copies compatible configuration values from legacy
+  `ProcessEmbedr` installations.
+
 ## [0.3.1] — 2026-07-23
 
 ### Fixed

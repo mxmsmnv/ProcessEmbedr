@@ -7,18 +7,14 @@ require_once(__DIR__ . '/Embedrs.php');
  * 
  * Admin interface for managing content embeds
  * 
- * @property string $componentsPath
- * @property string $openTag
- * @property string $closeTag
- * @property bool $autoDiscoverTypes
- * @property bool $showTypeIcons
+ * Configuration and public API live in Embedr.module.php.
  */
-class ProcessEmbedr extends Process implements ConfigurableModule {
+class ProcessEmbedr extends Process {
     
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr',
-            'version' => '0.3.1',
+            'version' => '0.4.0',
             'summary' => 'Manage dynamic content embeds with live preview',
             'author' => 'Maxim Semenov',
             'href' => 'https://smnv.org',
@@ -28,24 +24,17 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
                 'embedr' => 'List and view embeds',
                 'embedr-edit' => 'Add/edit/delete embeds'
             ],
-            'requires' => 'InputfieldSelector, ProcessWire>=3.0.0',
-            'installs' => 'TextformatterEmbedr',
+            'requires' => 'Embedr>=0.4.0, InputfieldSelector, ProcessWire>=3.0.0',
+            'page' => [
+                'name' => 'embedr',
+                'parent' => 'setup',
+                'title' => 'Embedr',
+            ],
         ];
     }
-    
-    /**
-     * Default configuration
-     * 
-     * @var array
-     */
-    protected static $defaultConfig = [
-        'componentsPath' => 'components/',
-        'openTag' => '((',
-        'closeTag' => '))',
-        'autoDiscoverTypes' => false,
-        'showTypeIcons' => true,
-        'debugMode' => false,
-    ];
+
+    /** @var Embedr|null */
+    protected $embedr = null;
     
     /**
      * Embedrs collection
@@ -86,80 +75,28 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     }
     
     /**
-     * Construct
-     */
-    public function __construct() {
-        foreach(self::$defaultConfig as $key => $value) {
-            if(!isset($this->$key)) $this->$key = $value;
-        }
-        parent::__construct();
-    }
-    
-    /**
      * Init
      */
     public function init() {
         parent::init();
-        $this->embedrs = $this->wire(new Embedrs());
-        $this->types = $this->wire(new EmbedrTypes());
+        $this->embedr = $this->wire('modules')->get('Embedr');
+        $this->embedrs = $this->embedr->embeds();
+        $this->types = $this->embedr->types();
     }
-    
-    /**
-     * Install module
-     */
-    public function ___install() {
-        // Initialize collections
-        $types = $this->wire(new EmbedrTypes());
-        $embedrs = $this->wire(new Embedrs());
-        
-        // Install database tables
-        $types->install();
-        $embedrs->install();
-        
-        // Ensure admin page exists
-        $parent = $this->wire('pages')->get('name=setup');
-        $adminPage = $this->wire('pages')->get('name=embedr, parent=' . $parent->id);
-        
-        if(!$adminPage->id) {
-            $adminPage = new Page();
-            $adminPage->template = 'admin';
-            $adminPage->parent = $parent;
-            $adminPage->name = 'embedr';
-            $adminPage->title = 'Embedr';
-            $adminPage->process = $this;
-            
-            // Set process and save
-            $adminPage->save();
-            
-            $this->message("Created admin page at Setup → Embedr");
+
+    public function __get($key) {
+        if(in_array($key, [
+            'componentsPath',
+            'openTag',
+            'closeTag',
+            'autoDiscoverTypes',
+            'showTypeIcons',
+            'debugMode',
+            'fieldCacheExpire',
+        ], true) && $this->embedr) {
+            return $this->embedr->get($key);
         }
-        
-        // Auto-discover types if enabled
-        if($this->autoDiscoverTypes) {
-            $types->autoDiscover($this->componentsPath);
-        }
-    }
-    
-    /**
-     * Uninstall module
-     */
-    public function ___uninstall() {
-        // Initialize collections
-        $embedrs = $this->wire(new Embedrs());
-        $types = $this->wire(new EmbedrTypes());
-        
-        // Drop database tables (embeds first due to foreign key)
-        $embedrs->uninstall();
-        $types->uninstall();
-        
-        // Remove admin page if it exists
-        $parent = $this->wire('pages')->get('name=setup');
-        $adminPage = $this->wire('pages')->get('name=embedr, parent=' . $parent->id);
-        
-        if($adminPage->id) {
-            $adminPage->delete();
-            $this->message("Removed admin page from Setup → Embedr");
-        }
+        return parent::__get($key);
     }
     
     /**
@@ -372,7 +309,7 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             $output .= "</ol>";
             $output .= "<p>";
             $output .= "<a href='./types/' class='uk-button uk-button-primary'><i class='fa fa-cubes'></i> Manage Types</a> ";
-            $output .= "<a href='../module/edit?name=ProcessEmbedr' class='uk-button'>Module Settings</a>";
+            $output .= "<a href='../module/edit?name=Embedr' class='uk-button'>Module Settings</a>";
             $output .= "</p>";
             $output .= "</div>";
         }
@@ -462,7 +399,7 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
             if(!$embed) throw new WireException("Embed not found");
             $this->headline("Edit Embed: {$embed->title}");
         } else {
-            $embed = $this->wire(new Embedr());
+            $embed = $this->wire(new EmbedrItem());
             $this->headline("Add New Embed");
         }
         
@@ -484,10 +421,10 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
     /**
      * Build edit form
      * 
-     * @param Embedr $embed
+     * @param EmbedrItem $embed
      * @return InputfieldForm
      */
-    protected function buildEditForm(Embedr $embed) {
+    protected function buildEditForm(EmbedrItem $embed) {
         $form = $this->modules->get('InputfieldForm');
         $form->attr('method', 'post');
         // Don't set action - let ProcessWire handle it automatically to avoid /edit/edit/ issue
@@ -619,9 +556,9 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
      * Process edit form
      * 
      * @param InputfieldForm $form
-     * @param Embedr $embed
+     * @param EmbedrItem $embed
      */
-    protected function processEditForm($form, Embedr $embed) {
+    protected function processEditForm($form, EmbedrItem $embed) {
         
         $this->debugLog('processEditForm started', [
             'embed_id' => $embed->id,
@@ -992,78 +929,4 @@ class ProcessEmbedr extends Process implements ConfigurableModule {
         return '';
     }
     
-    /**
-     * Module configuration
-     * 
-     * @param array $data
-     * @return InputfieldWrapper
-     */
-    public static function getModuleConfigInputfields(array $data) {
-        $inputfields = new InputfieldWrapper();
-        $modules = wire('modules');
-        
-        $data = array_merge(self::$defaultConfig, $data);
-        
-        // Components path
-        $f = $modules->get('InputfieldText');
-        $f->attr('name', 'componentsPath');
-        $f->label = 'Components Path';
-        $f->description = 'Path to block templates relative to /site/templates/';
-        $f->notes = 'Example: includes/blocks/ or partials/shortcodes/';
-        $f->value = $data['componentsPath'];
-        $f->required = true;
-        $f->columnWidth = 50;
-        $inputfields->add($f);
-        
-        // Open tag
-        $f = $modules->get('InputfieldText');
-        $f->attr('name', 'openTag');
-        $f->label = 'Opening Tag';
-        $f->description = 'Tag that starts an embed';
-        $f->notes = 'Default: ((';
-        $f->value = $data['openTag'];
-        $f->columnWidth = 25;
-        $inputfields->add($f);
-        
-        // Close tag
-        $f = $modules->get('InputfieldText');
-        $f->attr('name', 'closeTag');
-        $f->label = 'Closing Tag';
-        $f->description = 'Tag that ends an embed';
-        $f->notes = 'Default: ))';
-        $f->value = $data['closeTag'];
-        $f->columnWidth = 25;
-        $inputfields->add($f);
-        
-        // Auto-discover types
-        $f = $modules->get('InputfieldCheckbox');
-        $f->attr('name', 'autoDiscoverTypes');
-        $f->label = 'Auto-discover Types';
-        $f->description = 'Automatically find and create types from template files in components path';
-        $f->notes = 'Scans for .php files and creates types on first access';
-        $f->attr('checked', $data['autoDiscoverTypes'] ? 'checked' : '');
-        $f->columnWidth = 33;
-        $inputfields->add($f);
-        
-        // Show type icons
-        $f = $modules->get('InputfieldCheckbox');
-        $f->attr('name', 'showTypeIcons');
-        $f->label = 'Show Type Icons';
-        $f->description = 'Display Font Awesome icons next to type names';
-        $f->attr('checked', $data['showTypeIcons'] ? 'checked' : '');
-        $f->columnWidth = 33;
-        $inputfields->add($f);
-        
-        // Debug mode
-        $f = $modules->get('InputfieldCheckbox');
-        $f->attr('name', 'debugMode');
-        $f->label = 'Debug Mode';
-        $f->description = 'Enable detailed logging for troubleshooting';
-        $f->notes = 'Logs saved to: Setup → Logs → embedr-debug';
-        $f->attr('checked', $data['debugMode'] ? 'checked' : '');
-        $f->columnWidth = 34;
-        $inputfields->add($f);
-        
-        return $inputfields;
-    }
 }

@@ -9,9 +9,10 @@ Get up and running with Embedr in 5 minutes.
 ### Upload Files
 ```
 /site/modules/Embedr/
+├── Embedr.module.php
 ├── ProcessEmbedr.module
 ├── TextformatterEmbedr.module
-├── Embedr.php
+├── EmbedrItem.php
 ├── Embedrs.php
 ├── EmbedrType.php
 ├── EmbedrTypes.php
@@ -222,7 +223,7 @@ Common cause: custom template accesses a field without `hasField()` guard.
 
 ## Get Help
 
-1. Enable Debug Mode: `Setup → Modules → ProcessEmbedr → Configure`
+1. Enable Debug Mode: `Setup → Modules → Embedr → Configure`
 2. Check logs: `Setup → Logs → embedr-debug`
 3. Look for errors: `Setup → Logs → embedr-errors`
 4. Ask in forums with log output

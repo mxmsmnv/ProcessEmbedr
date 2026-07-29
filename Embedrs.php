@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-require_once(__DIR__ . '/Embedr.php');
+require_once(__DIR__ . '/EmbedrItem.php');
 require_once(__DIR__ . '/EmbedrTypes.php');
 
 /**
@@ -37,7 +37,7 @@ class Embedrs extends Wire {
     protected function getDebugMode() {
         if($this->debugMode !== null) return $this->debugMode;
         try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $config = $this->wire('modules')->getModuleConfigData('Embedr');
             $this->debugMode = !empty($config['debugMode']);
         } catch(\Exception $e) {
             $this->debugMode = false;
@@ -125,7 +125,7 @@ class Embedrs extends Wire {
             $query->execute();
             
             while($row = $query->fetch(\PDO::FETCH_ASSOC)) {
-                $embed = $this->wire(new Embedr());
+                $embed = $this->wire(new EmbedrItem());
                 $embed->setArray($row);
                 
                 // Load type
@@ -150,7 +150,7 @@ class Embedrs extends Wire {
      * Get embed by ID
      * 
      * @param int $id
-     * @return Embedr|null
+     * @return EmbedrItem|null
      */
     public function getById($id) {
         $id = (int) $id;
@@ -164,7 +164,7 @@ class Embedrs extends Wire {
      * Get embed by name
      * 
      * @param string $name
-     * @return Embedr|null
+     * @return EmbedrItem|null
      */
     public function get($name) {
         if(is_numeric($name)) {
@@ -181,10 +181,10 @@ class Embedrs extends Wire {
     /**
      * Save embed
      *
-     * @param Embedr $embed
+     * @param EmbedrItem $embed
      * @return bool|int Returns ID on success, false on failure
      */
-    public function save(Embedr $embed) {
+    public function save(EmbedrItem $embed) {
         $database  = $this->wire('database');
         $table     = self::TABLE_NAME;
         $debugMode = $this->getDebugMode();
@@ -302,7 +302,7 @@ class Embedrs extends Wire {
     /**
      * Delete embed
      * 
-     * @param int|Embedr $embed
+     * @param int|EmbedrItem $embed
      * @return bool
      */
     public function delete($embed) {

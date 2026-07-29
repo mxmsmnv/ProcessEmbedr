@@ -1,7 +1,7 @@
 <?php namespace ProcessWire;
 
 /**
- * Embedr
+ * Embedr Item
  * 
  * Represents a single embed instance
  * 
@@ -14,7 +14,7 @@
  * @property int $created
  * @property int $modified
  */
-class Embedr extends WireData {
+class EmbedrItem extends WireData {
     
     /**
      * Default values
@@ -103,7 +103,7 @@ class Embedr extends WireData {
     protected function getDebugMode() {
         if($this->debugMode !== null) return $this->debugMode;
         try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $config = $this->wire('modules')->getModuleConfigData('Embedr');
             $this->debugMode = !empty($config['debugMode']);
         } catch(\Exception $e) {
             $this->debugMode = false;
@@ -136,7 +136,7 @@ class Embedr extends WireData {
      *
      * @return string
      */
-    public function render() {
+    public function render(array $context = []) {
         $debugMode = $this->getDebugMode();
 
         $user = $this->wire('user');
@@ -198,6 +198,7 @@ class Embedr extends WireData {
                     $input     = $this->wire('input');
                     $sanitizer = $this->wire('sanitizer');
                     $embed     = $this;
+                    $embedContext = $context;
 
                     ob_start();
                     try {
@@ -327,7 +328,7 @@ class Embedr extends WireData {
      * @return string
      */
     public function getShortcode() {
-        $embedr = $this->wire('modules')->get('ProcessEmbedr');
+        $embedr = $this->wire('modules')->get('Embedr');
         $openTag = $embedr ? $embedr->openTag : '((';
         $closeTag = $embedr ? $embedr->closeTag : '))';
         

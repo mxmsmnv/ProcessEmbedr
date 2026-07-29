@@ -15,12 +15,12 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     public static function getModuleInfo() {
         return [
             'title' => 'Embedr Text Formatter',
-            'version' => '0.3.1',
+            'version' => '0.4.0',
             'summary' => 'Dynamic content blocks embedding - parses ((name)) tags',
             'author' => 'Maxim Semenov',
             'href'     => 'https://smnv.org',
             'icon' => 'code',
-            'requires' => 'ProcessWire>=3.0.0',
+            'requires' => 'Embedr>=0.4.0, ProcessWire>=3.0.0',
         ];
     }
     
@@ -73,7 +73,7 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     protected $embedrs = null;
 
     /**
-     * Whether ProcessEmbedr config has been loaded into this instance
+     * Whether Embedr config has been loaded into this instance
      *
      * @var bool
      */
@@ -127,18 +127,18 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
     }
     
     /**
-     * Load config from ProcessEmbedr (primary source) once per instance.
+     * Load config from Embedr (primary source) once per instance.
      * Falls back to own saved values or hard-coded defaults.
      */
     protected function loadConfig() {
         if($this->configLoaded) return;
         try {
-            $config = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
+            $config = $this->wire('modules')->getModuleConfigData('Embedr');
             if(!empty($config['openTag']))  $this->openTag  = $config['openTag'];
             if(!empty($config['closeTag'])) $this->closeTag = $config['closeTag'];
             $this->debugMode = !empty($config['debugMode']);
         } catch(\Exception $e) {
-            // ProcessEmbedr not available — keep own defaults
+            // Embedr not available — keep own defaults
         }
         $this->configLoaded = true;
     }
@@ -295,7 +295,8 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
             return $this->embedrs;
         }
         
-        $this->embedrs = $this->wire(new Embedrs());
+        $embedr = $this->wire('modules')->get('Embedr');
+        $this->embedrs = $embedr ? $embedr->embeds() : $this->wire(new Embedrs());
         return $this->embedrs;
     }
     
@@ -325,11 +326,11 @@ class TextformatterEmbedr extends Textformatter implements ConfigurableModule {
         $inputfields = new InputfieldWrapper();
         $modules = wire('modules');
 
-        // Tags are now managed exclusively in ProcessEmbedr settings
+        // Tags are managed exclusively in Embedr settings
         $f = $modules->get('InputfieldMarkup');
         $f->label = 'Tag Configuration';
         $f->value = '<p class="uk-text-meta">Opening and closing tags are configured in ' .
-            '<a href="../ProcessEmbedr/">Embedr module settings</a> and applied here automatically.</p>';
+            '<a href="../Embedr/">Embedr module settings</a> and applied here automatically.</p>';
         $inputfields->add($f);
 
         // Usage instructions

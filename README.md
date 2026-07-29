@@ -6,7 +6,8 @@
 
 ![Embedr](assets/Embedr.png)
 
-If this project helps your work, consider supporting future development: [GitHub Sponsors](https://github.com/sponsors/mxmsmnv) or [smnv.org/sponsor](https://smnv.org/sponsor/).  
+If this project helps your work, consider supporting future development: [GitHub Sponsors](https://github.com/sponsors/mxmsmnv) or [smnv.org/sponsor](https://smnv.org/sponsor/).
+
 **License:** MIT  
 **ProcessWire:** 3.0+  
 **Changelog:** [CHANGELOG.md](CHANGELOG.md)
@@ -41,9 +42,10 @@ Dynamic content embed management system with live preview, custom PHP templates,
 1. **Upload module files** to `/site/modules/Embedr/`:
 ```
 /site/modules/Embedr/
+├── Embedr.module.php
 ├── ProcessEmbedr.module
 ├── TextformatterEmbedr.module
-├── Embedr.php
+├── EmbedrItem.php
 ├── Embedrs.php
 ├── EmbedrType.php
 ├── EmbedrTypes.php
@@ -92,9 +94,10 @@ Selector: template=article, limit=6
 
 ```
 Embedr Ecosystem
+├── Embedr (Core API + Configuration)
 ├── ProcessEmbedr (Admin Interface)
 ├── TextformatterEmbedr (Parser)
-├── Embedr (Single Embed Object)
+├── EmbedrItem (Single Embed Object)
 ├── Embedrs (Embed Collection + Database)
 ├── EmbedrType (Single Type Object)
 ├── EmbedrTypes (Type Collection + Database)
@@ -109,9 +112,9 @@ Embedr Ecosystem
    ↓
 2. TextformatterEmbedr (Textformatter)
    ↓
-3. Embedrs::get('embed-name')
+3. Embedr::getEmbed('embed-name')
    ↓
-4. Embedr::render()
+4. EmbedrItem::render()
    ↓
 5. Check: PHP Template exists?
    ├─→ YES: Include custom PHP template
@@ -127,7 +130,7 @@ Embedr Ecosystem
 
 ### Module Settings
 
-Access via: `Setup → Modules → ProcessEmbedr → Configure`
+Access via: `Setup → Modules → Embedr → Configure`
 
 **Components Path** (default: `components/`)
 - Path to PHP template files relative to `/site/templates/`
@@ -214,7 +217,8 @@ $page       // Page - Current page
 $config     // Config - ProcessWire config
 $input      // WireInput - Request data
 $sanitizer  // Sanitizer - Sanitization methods
-$embed      // Embedr - The embed object
+$embed      // EmbedrItem - The embed object
+$embedContext // array - Optional context passed to Embedr::render()
 ```
 
 ### Basic Template Example
@@ -344,7 +348,7 @@ Permissions → ☑ embedr-edit (if needed)
 ### Enabling Debug Mode
 
 ```
-Setup → Modules → ProcessEmbedr → Configure
+Setup → Modules → Embedr → Configure
 ☑ Debug Mode
 Save
 ```
@@ -424,7 +428,7 @@ Shows:
 
 **Solutions:**
 - Create file: `/site/templates/components/template.php`
-- Check path: `Setup → Modules → ProcessEmbedr → Components Path`
+- Check path: `Setup → Modules → Embedr → Components Path`
 - Set permissions: `chmod 644 template.php`
 
 #### 3. Render error for guests
@@ -468,7 +472,7 @@ Shows:
 
 1. **Enable Debug Mode**
 ```
-Setup → Modules → ProcessEmbedr → Configure → ☑ Debug Mode
+Setup → Modules → Embedr → Configure → ☑ Debug Mode
 ```
 
 2. **Reproduce the issue**
@@ -494,7 +498,29 @@ Setup → Logs → embedr-errors (errors only)
 
 ## API Reference
 
-### Embedr Class
+### Embedr Module
+
+```php
+$embedr = $modules->get('Embedr');
+
+$embedr->render('latest-articles');
+$embedr->getEmbed('latest-articles');
+$embedr->embeds();
+$embedr->types();
+
+echo $embedr->renderField($page, 'content_blocks', [
+    'template' => 'components/content-blocks.php',
+    'cache' => 3600,
+    'variables' => ['variant' => 'homepage'],
+]);
+```
+
+Field renderer templates receive `$page`, `$field`, `$value`, `$rows`,
+`$embedr`, and any values supplied through `variables`. This makes the same API
+usable with ProFields Table, Repeater, PageTable, Page Reference, and custom
+iterable field values.
+
+### EmbedrItem Class
 
 **Properties:**
 ```php
@@ -518,10 +544,10 @@ $embed->getCount()         // int - Count results without rendering
 
 **Methods:**
 ```php
-$embedrs->get($name)              // Embedr|null - Get by name
-$embedrs->getById($id)            // Embedr|null - Get by ID
+$embedrs->get($name)              // EmbedrItem|null - Get by name
+$embedrs->getById($id)            // EmbedrItem|null - Get by ID
 $embedrs->getAll($refresh=false)  // WireArray - Get all embeds
-$embedrs->save(Embedr $embed)     // int|false - Save embed
+$embedrs->save(EmbedrItem $embed) // int|false - Save embed
 $embedrs->delete($id)             // bool - Delete embed
 ```
 

@@ -28,9 +28,10 @@ Upload all files to `/site/modules/Embedr/`:
 
 ```
 /site/modules/Embedr/
-├── ProcessEmbedr.module             (Main admin module)
+├── Embedr.module.php                (Core API and configuration)
+├── ProcessEmbedr.module             (Admin application)
 ├── TextformatterEmbedr.module       (Text formatter)
-├── Embedr.php                       (Single embed class)
+├── EmbedrItem.php                   (Single embed class)
 ├── Embedrs.php                      (Embed collection)
 ├── EmbedrType.php                   (Type class)
 ├── EmbedrTypes.php                  (Type collection)
@@ -66,8 +67,9 @@ chmod 644 site/modules/Embedr/*
 5. Click **Install**
 6. Confirm installation
 
-**Expected outcome:** You should see two new items installed:
-- ✅ **Embedr** (ProcessEmbedr)
+**Expected outcome:** You should see three new items installed:
+- ✅ **Embedr** (core API and configuration)
+- ✅ **Process Embedr** (admin application)
 - ✅ **Embedr Text Formatter** (TextformatterEmbedr)
 
 ---
@@ -89,7 +91,7 @@ Then follow steps 4 in Method 1.
 
 ### Step 1: Configure Module Settings
 
-Navigate to: **Setup → Modules → ProcessEmbedr → Configure**
+Navigate to: **Setup → Modules → Embedr → Configure**
 
 **Recommended Initial Settings:**
 
@@ -234,7 +236,8 @@ chmod 644 site/modules/Embedr/*.php
 ```
 
 3. **Check ProcessWire requirements:**
-   - Must have `ProcessEmbedr.module` and `TextformatterEmbedr.module`
+   - Must have `Embedr.module.php`, `ProcessEmbedr.module`, and
+     `TextformatterEmbedr.module`
    - Files must be valid PHP (no syntax errors)
 
 4. **Check PHP error log** for syntax errors
@@ -342,7 +345,7 @@ Permissions → ☑ embedr-edit
 
 **Solution:**
 
-1. Enable Debug Mode (`Setup → Modules → ProcessEmbedr → Configure`)
+1. Enable Debug Mode (`Setup → Modules → Embedr → Configure`)
 2. Open the failing page as a guest (incognito)
 3. Check `Setup → Logs → embedr-errors` for the full error
 4. Common causes:
@@ -372,7 +375,7 @@ cp -r site/modules/Embedr site/modules/Embedr.backup
 Modules → Refresh
 ```
 
-5. **Verify version** in `Modules → ProcessEmbedr`
+5. **Verify version** in `Modules → Embedr`
 
 6. **Test as guest** — open the site in incognito mode and verify embeds render correctly
 
@@ -428,7 +431,7 @@ After successful installation:
 
 If installation fails:
 
-1. **Enable Debug Mode** (`Setup → Modules → ProcessEmbedr → Configure`)
+1. **Enable Debug Mode** (`Setup → Modules → Embedr → Configure`)
 2. **Check logs:** `Setup → Logs → embedr-debug` and `embedr-errors`
 3. **Open an issue:** [github.com/mxmsmnv/Embedr](https://github.com/mxmsmnv/Embedr)
 4. **Contact the author:** maxim@smnv.org
