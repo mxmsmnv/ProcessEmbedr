@@ -222,7 +222,18 @@ class Embedr extends WireData implements Module, ConfigurableModule {
      */
     protected function migrateLegacyConfig() {
         $legacy = $this->wire('modules')->getModuleConfigData('ProcessEmbedr');
-        if(!is_array($legacy) || !$legacy) return;
+        if(!is_array($legacy)) $legacy = [];
+
+        $formatter = $this->wire('modules')->getModuleConfigData('TextformatterEmbedr');
+        if(is_array($formatter)) {
+            foreach(['openTag', 'closeTag'] as $key) {
+                if(!array_key_exists($key, $legacy) && array_key_exists($key, $formatter)) {
+                    $legacy[$key] = $formatter[$key];
+                }
+            }
+        }
+
+        if(!$legacy) return;
 
         $current = $this->wire('modules')->getModuleConfigData($this);
         foreach(self::$defaultConfig as $key => $default) {
